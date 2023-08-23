@@ -9,7 +9,7 @@ function createPostgresConfig() {
 }
 
 function setPostgresPassword() {
-    sudo -u postgres psql -c "ALTER USER renderer PASSWORD '${PGPASSWORD:-renderer}'"
+    sudo -u postgres psql -c "ALTER USER ${POSTGRES_USER} PASSWORD '${PGPASSWORD:-renderer}'"
 }
 
 if [ "$#" -ne 1 ]; then
@@ -31,7 +31,7 @@ set -x
 
 # if there is no custom style mounted, then use osm-carto
 if [ ! "$(ls -A /data/style/)" ]; then
-    mv /home/renderer/src/openstreetmap-carto-backup/* /data/style/
+    mv /home/${POSTGRES_USER}/src/openstreetmap-carto-backup/* /data/style/
 fi
 
 # carto build
@@ -42,23 +42,23 @@ fi
 
 if [ "$1" == "import" ]; then
     # Ensure that database directory is in right state
-    mkdir -p /data/database/postgres/
-    chown renderer: /data/database/
-    chown -R postgres: /var/lib/postgresql /data/database/postgres/
-    if [ ! -f /data/database/postgres/PG_VERSION ]; then
-        sudo -u postgres /usr/lib/postgresql/$PG_VERSION/bin/pg_ctl -D /data/database/postgres/ initdb -o "--locale C.UTF-8"
-    fi
+    mkdir -p /data/database/
+    chown ${POSTGRES_USER}: /data/database/
+    #    chown -R postgres: /var/lib/postgresql /data/database/postgres/
+    #    if [ ! -f /data/database/postgres/PG_VERSION ]; then
+    #        sudo -u postgres /usr/lib/postgresql/$PG_VERSION/bin/pg_ctl -D /data/database/postgres/ initdb -o "--locale C.UTF-8"
+    #    fi
 
     # Initialize PostgreSQL
-    createPostgresConfig
-    service postgresql start
-    sudo -u postgres createuser renderer
-    sudo -u postgres createdb -E UTF8 -O renderer gis
-    sudo -u postgres psql -d gis -c "CREATE EXTENSION postgis;"
-    sudo -u postgres psql -d gis -c "CREATE EXTENSION hstore;"
-    sudo -u postgres psql -d gis -c "ALTER TABLE geometry_columns OWNER TO renderer;"
-    sudo -u postgres psql -d gis -c "ALTER TABLE spatial_ref_sys OWNER TO renderer;"
-    setPostgresPassword
+    #    createPostgresConfig
+    #    service postgresql start
+    #    sudo -u postgres createuser ${POSTGRES_USER}
+    #    sudo -u postgres createdb -E UTF8 -O ${POSTGRES_USER} ${POSTGRES_DB}
+    #    sudo -u postgres psql -d ${POSTGRES_DB} -c "CREATE EXTENSION postgis;"
+    #    sudo -u postgres psql -d ${POSTGRES_DB} -c "CREATE EXTENSION hstore;"
+    #    sudo -u postgres psql -d ${POSTGRES_DB} -c "ALTER TABLE geometry_columns OWNER TO ${POSTGRES_USER};"
+    #    sudo -u postgres psql -d ${POSTGRES_DB} -c "ALTER TABLE spatial_ref_sys OWNER TO ${POSTGRES_USER};"
+    #    setPostgresPassword
 
     # Download Luxembourg as sample if no data is provided
     if [ ! -f /data/region.osm.pbf ] && [ -z "${DOWNLOAD_PBF:-}" ]; then
@@ -81,13 +81,13 @@ if [ "$1" == "import" ]; then
         REPLICATION_TIMESTAMP=`osmium fileinfo -g header.option.osmosis_replication_timestamp /data/region.osm.pbf`
 
         # initial setup of osmosis workspace (for consecutive updates)
-        sudo -E -u renderer openstreetmap-tiles-update-expire.sh $REPLICATION_TIMESTAMP
+        sudo -E -u ${POSTGRES_USER} openstreetmap-tiles-update-expire.sh $REPLICATION_TIMESTAMP
     fi
 
     # copy polygon file if available
     if [ -f /data/region.poly ]; then
         cp /data/region.poly /data/database/region.poly
-        chown renderer: /data/database/region.poly
+        chown ${POSTGRES_USER}: /data/database/region.poly
     fi
 
     # flat-nodes
@@ -96,7 +96,7 @@ if [ "$1" == "import" ]; then
     fi
 
     # Import data
-    sudo -u renderer osm2pgsql -d gis --create --slim -G --hstore  \
+    sudo -u ${POSTGRES_USER} osm2pgsql -d ${POSTGRES_DB} --create --slim -G --hstore  \
       --tag-transform-script /data/style/${NAME_LUA:-openstreetmap-carto.lua}  \
       --number-processes ${THREADS:-4}  \
       -S /data/style/${NAME_STYLE:-openstreetmap-carto.style}  \
@@ -107,24 +107,24 @@ if [ "$1" == "import" ]; then
     # old flat-nodes dir
     if [ -f /nodes/flat_nodes.bin ] && ! [ -f /data/database/flat_nodes.bin ]; then
         mv /nodes/flat_nodes.bin /data/database/flat_nodes.bin
-        chown renderer: /data/database/flat_nodes.bin
+        chown ${POSTGRES_USER}: /data/database/flat_nodes.bin
     fi
 
     # Create indexes
     if [ -f /data/style/${NAME_SQL:-indexes.sql} ]; then
-        sudo -u postgres psql -d gis -f /data/style/${NAME_SQL:-indexes.sql}
+        sudo -u postgres psql -d ${POSTGRES_DB} -f /data/style/${NAME_SQL:-indexes.sql}
     fi
 
     #Import external data
-    chown -R renderer: /home/renderer/src/ /data/style/
+    chown -R ${POSTGRES_USER}: /home/${POSTGRES_USER}/src/ /data/style/
     if [ -f /data/style/scripts/get-external-data.py ] && [ -f /data/style/external-data.yml ]; then
-        sudo -E -u renderer python3 /data/style/scripts/get-external-data.py -c /data/style/external-data.yml -D /data/style/data
+        sudo -E -u ${POSTGRES_USER} python3 /data/style/scripts/get-external-data.py -c /data/style/external-data.yml -D /data/style/data
     fi
 
-    # Register that data has changed for mod_tile caching purposes
-    sudo -u renderer touch /data/database/planet-import-complete
+    # Re${POSTGRES_DB}ter that data has changed for mod_tile caching purposes
+    sudo -u ${POSTGRES_USER} touch /data/database/planet-import-complete
 
-    service postgresql stop
+    # service postgresql stop
 
     exit 0
 fi
@@ -154,7 +154,7 @@ if [ "$1" == "run" ]; then
     fi
 
     # Fix postgres data privileges
-    chown -R postgres: /var/lib/postgresql/ /data/database/postgres/
+    # chown -R postgres: /var/lib/postgresql/ /data/database/postgres/
 
     # Configure Apache CORS
     if [ "${ALLOW_CORS:-}" == "enabled" ] || [ "${ALLOW_CORS:-}" == "1" ]; then
@@ -162,10 +162,10 @@ if [ "$1" == "run" ]; then
     fi
 
     # Initialize PostgreSQL and Apache
-    createPostgresConfig
-    service postgresql start
+    #createPostgresConfig
+    # service postgresql start
     service apache2 restart
-    setPostgresPassword
+    #setPostgresPassword
 
     # Configure renderd threads
     sed -i -E "s/num_threads=[0-9]+/num_threads=${THREADS:-4}/g" /etc/renderd.conf
@@ -173,10 +173,10 @@ if [ "$1" == "run" ]; then
     # start cron job to trigger consecutive updates
     if [ "${UPDATES:-}" == "enabled" ] || [ "${UPDATES:-}" == "1" ]; then
         /etc/init.d/cron start
-        sudo -u renderer touch /var/log/tiles/run.log; tail -f /var/log/tiles/run.log >> /proc/1/fd/1 &
-        sudo -u renderer touch /var/log/tiles/osmosis.log; tail -f /var/log/tiles/osmosis.log >> /proc/1/fd/1 &
-        sudo -u renderer touch /var/log/tiles/expiry.log; tail -f /var/log/tiles/expiry.log >> /proc/1/fd/1 &
-        sudo -u renderer touch /var/log/tiles/osm2pgsql.log; tail -f /var/log/tiles/osm2pgsql.log >> /proc/1/fd/1 &
+        sudo -u ${POSTGRES_USER} touch /var/log/tiles/run.log; tail -f /var/log/tiles/run.log >> /proc/1/fd/1 &
+        sudo -u ${POSTGRES_USER} touch /var/log/tiles/osmosis.log; tail -f /var/log/tiles/osmosis.log >> /proc/1/fd/1 &
+        sudo -u ${POSTGRES_USER} touch /var/log/tiles/expiry.log; tail -f /var/log/tiles/expiry.log >> /proc/1/fd/1 &
+        sudo -u ${POSTGRES_USER} touch /var/log/tiles/osm2pgsql.log; tail -f /var/log/tiles/osm2pgsql.log >> /proc/1/fd/1 &
 
     fi
 
@@ -186,11 +186,11 @@ if [ "$1" == "run" ]; then
     }
     trap stop_handler SIGTERM
 
-    sudo -u renderer renderd -f -c /etc/renderd.conf &
+    sudo -u ${POSTGRES_USER} renderd -f -c /etc/renderd.conf &
     child=$!
     wait "$child"
 
-    service postgresql stop
+    # service postgresql stop
 
     exit 0
 fi

@@ -50,11 +50,12 @@ ENV PG_VERSION 15
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
+# cron \
+
 # Get packages
-RUN apt-get update \
-&& apt-get install -y --no-install-recommends \
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends \
  apache2 \
- cron \
  dateutils \
  fonts-hanazono \
  fonts-noto-cjk \
@@ -69,11 +70,13 @@ RUN apt-get update \
  npm \
  osm2pgsql \
  osmium-tool \
- osmosis \
- postgresql-$PG_VERSION \
- postgresql-$PG_VERSION-postgis-3 \
- postgresql-$PG_VERSION-postgis-3-scripts \
- postgis \
+ osmosis
+
+# postgresql-$PG_VERSION \
+# postgresql-$PG_VERSION-postgis-3 \
+# postgresql-$PG_VERSION-postgis-3-scripts \
+# postgis \
+RUN apt-get install -y --no-install-recommends \
  python-is-python3 \
  python3-mapnik \
  python3-lxml \
@@ -82,10 +85,10 @@ RUN apt-get update \
  python3-pip \
  renderd \
  sudo \
- vim \
-&& apt-get clean autoclean \
-&& apt-get autoremove --yes \
-&& rm -rf /var/lib/{apt,dpkg,cache,log}/
+ vim
+#&& apt-get clean autoclean \
+#&& apt-get autoremove --yes \
+#&& rm -rf /var/lib/{apt,dpkg,cache,log}/
 
 RUN adduser --disabled-password --gecos "" renderer
 
@@ -127,15 +130,18 @@ COPY openstreetmap-tiles-update-expire.sh /usr/bin/
 RUN chmod +x /usr/bin/openstreetmap-tiles-update-expire.sh \
 && mkdir /var/log/tiles \
 && chmod a+rw /var/log/tiles \
-&& ln -s /home/renderer/src/mod_tile/osmosis-db_replag /usr/bin/osmosis-db_replag \
-&& echo "* * * * *   renderer    openstreetmap-tiles-update-expire.sh\n" >> /etc/crontab
+&& ln -s /home/renderer/src/mod_tile/osmosis-db_replag /usr/bin/osmosis-db_replag # \
+# && echo "* * * * *   renderer    openstreetmap-tiles-update-expire.sh\n" >> /etc/crontab
 
 # Configure PosgtreSQL
-COPY postgresql.custom.conf.tmpl /etc/postgresql/$PG_VERSION/main/
-RUN chown -R postgres:postgres /var/lib/postgresql \
-&& chown postgres:postgres /etc/postgresql/$PG_VERSION/main/postgresql.custom.conf.tmpl \
-&& echo "host all all 0.0.0.0/0 scram-sha-256" >> /etc/postgresql/$PG_VERSION/main/pg_hba.conf \
-&& echo "host all all ::/0 scram-sha-256" >> /etc/postgresql/$PG_VERSION/main/pg_hba.conf
+#COPY postgresql.custom.conf.tmpl /etc/postgresql/$PG_VERSION/main/
+#RUN chown -R postgres:postgres /var/lib/postgresql \
+#&& chown postgres:postgres /etc/postgresql/$PG_VERSION/main/postgresql.custom.conf.tmpl \
+#&& echo "host all all 0.0.0.0/0 scram-sha-256" >> /etc/postgresql/$PG_VERSION/main/pg_hba.conf \
+#&& echo "host all all ::/0 scram-sha-256" >> /etc/postgresql/$PG_VERSION/main/pg_hba.conf
+
+#  &&  mv  /var/lib/postgresql/$PG_VERSION/main/  /data/database/postgres/  \
+#   &&  ln  -s  /data/database/postgres  /var/lib/postgresql/$PG_VERSION/main             \
 
 # Create volume directories
 RUN mkdir -p /run/renderd/ \
@@ -145,10 +151,8 @@ RUN mkdir -p /run/renderd/ \
   &&  chown  -R  renderer:  /data/  \
   &&  chown  -R  renderer:  /home/renderer/src/  \
   &&  chown  -R  renderer:  /run/renderd  \
-  &&  mv  /var/lib/postgresql/$PG_VERSION/main/  /data/database/postgres/  \
   &&  mv  /var/cache/renderd/tiles/            /data/tiles/     \
   &&  chown  -R  renderer: /data/tiles \
-  &&  ln  -s  /data/database/postgres  /var/lib/postgresql/$PG_VERSION/main             \
   &&  ln  -s  /data/style              /home/renderer/src/openstreetmap-carto  \
   &&  ln  -s  /data/tiles              /var/cache/renderd/tiles                \
 ;
