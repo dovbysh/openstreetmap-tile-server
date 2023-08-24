@@ -189,7 +189,7 @@ if [ "$1" == "run" ]; then
 
     # start cron job to trigger consecutive updates
     if [ "${UPDATES:-}" == "enabled" ] || [ "${UPDATES:-}" == "1" ]; then
-        /etc/init.d/cron start
+        # /etc/init.d/cron start
         touch /var/log/tiles/run.log; tail -f /var/log/tiles/run.log >> /proc/1/fd/1 &
         touch /var/log/tiles/osmosis.log; tail -f /var/log/tiles/osmosis.log >> /proc/1/fd/1 &
         touch /var/log/tiles/expiry.log; tail -f /var/log/tiles/expiry.log >> /proc/1/fd/1 &
@@ -202,6 +202,11 @@ if [ "$1" == "run" ]; then
         kill -TERM "$child"
     }
     trap stop_handler SIGTERM
+
+    export PGHOST=$POSTGRES_HOST
+    export PGPORT=$POSTGRES_PORT
+    export PGUSER=$POSTGRES_USER
+    export PGPASSWORD=$POSTGRES_PASSWORD
 
     renderd -f -c /etc/renderd.conf &
     child=$!
