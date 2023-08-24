@@ -130,7 +130,8 @@ COPY openstreetmap-tiles-update-expire.sh /usr/bin/
 RUN chmod +x /usr/bin/openstreetmap-tiles-update-expire.sh \
 && mkdir /var/log/tiles \
 && chmod a+rw /var/log/tiles \
-&& ln -s /home/renderer/src/mod_tile/osmosis-db_replag /usr/bin/osmosis-db_replag # \
+&& ln -s /home/renderer/src/mod_tile/osmosis-db_replag /usr/bin/osmosis-db_replag
+# \
 # && echo "* * * * *   renderer    openstreetmap-tiles-update-expire.sh\n" >> /etc/crontab
 
 # Configure PosgtreSQL
@@ -175,4 +176,4 @@ COPY --from=compiler-stylesheet /root/openstreetmap-carto /home/renderer/src/ope
 COPY run.sh /
 ENTRYPOINT ["/run.sh"]
 CMD []
-EXPOSE 80 5432
+EXPOSE 80

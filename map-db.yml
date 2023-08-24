@@ -5,13 +5,17 @@ x-envs: &envs
     POSTGRES_DB: "${POSTGRES_DB:-gis}"
     POSTGRES_USER: "${POSTGRES_USER:-renderer}"
     POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+    POSTGRES_HOST: "${POSTGRES_HOST:-db}"
+    POSTGRES_PORT: "${POSTGRES_PORT:-5432}"
 
 
 services:
   map:
     #image: overv/openstreetmap-tile-server
+    <<: *envs
     build:
       context: .
+      target: final
     volumes:
       - osm-data:/data
     ports:

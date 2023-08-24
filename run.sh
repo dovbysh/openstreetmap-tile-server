@@ -43,7 +43,7 @@ fi
 if [ "$1" == "import" ]; then
     # Ensure that database directory is in right state
     mkdir -p /data/database/
-    chown ${POSTGRES_USER}: /data/database/
+    # chown ${POSTGRES_USER}: /data/database/
     #    chown -R postgres: /var/lib/postgresql /data/database/postgres/
     #    if [ ! -f /data/database/postgres/PG_VERSION ]; then
     #        sudo -u postgres /usr/lib/postgresql/$PG_VERSION/bin/pg_ctl -D /data/database/postgres/ initdb -o "--locale C.UTF-8"
@@ -81,13 +81,13 @@ if [ "$1" == "import" ]; then
         REPLICATION_TIMESTAMP=`osmium fileinfo -g header.option.osmosis_replication_timestamp /data/region.osm.pbf`
 
         # initial setup of osmosis workspace (for consecutive updates)
-        sudo -E -u ${POSTGRES_USER} openstreetmap-tiles-update-expire.sh $REPLICATION_TIMESTAMP
+        openstreetmap-tiles-update-expire.sh $REPLICATION_TIMESTAMP
     fi
 
     # copy polygon file if available
     if [ -f /data/region.poly ]; then
         cp /data/region.poly /data/database/region.poly
-        chown ${POSTGRES_USER}: /data/database/region.poly
+        /data/database/region.poly
     fi
 
     # flat-nodes
@@ -96,7 +96,13 @@ if [ "$1" == "import" ]; then
     fi
 
     # Import data
-    sudo -u ${POSTGRES_USER} osm2pgsql -d ${POSTGRES_DB} --create --slim -G --hstore  \
+    echo "${POSTGRES_HOST}:${POSTGRES_PORT}:${POSTGRES_DB}:${POSTGRES_USER}:${POSTGRES_PASSWORD}" >>/root/.pgpass
+    chmod 0600 /root/.pgpass
+    osm2pgsql -d ${POSTGRES_DB} \
+      --username=${POSTGRES_USER} \
+      --host=${POSTGRES_HOST} \
+      --port=${POSTGRES_PORT} \
+      --create --slim -G --hstore  \
       --tag-transform-script /data/style/${NAME_LUA:-openstreetmap-carto.lua}  \
       --number-processes ${THREADS:-4}  \
       -S /data/style/${NAME_STYLE:-openstreetmap-carto.style}  \
@@ -107,22 +113,28 @@ if [ "$1" == "import" ]; then
     # old flat-nodes dir
     if [ -f /nodes/flat_nodes.bin ] && ! [ -f /data/database/flat_nodes.bin ]; then
         mv /nodes/flat_nodes.bin /data/database/flat_nodes.bin
-        chown ${POSTGRES_USER}: /data/database/flat_nodes.bin
+        # chown ${POSTGRES_USER}: /data/database/flat_nodes.bin
     fi
 
     # Create indexes
     if [ -f /data/style/${NAME_SQL:-indexes.sql} ]; then
-        sudo -u postgres psql -d ${POSTGRES_DB} -f /data/style/${NAME_SQL:-indexes.sql}
+        psql -d ${POSTGRES_DB} \
+             --username=${POSTGRES_USER} \
+             --host=${POSTGRES_HOST} \
+             --port=${POSTGRES_PORT} \
+             -f /data/style/${NAME_SQL:-indexes.sql}
     fi
 
     #Import external data
-    chown -R ${POSTGRES_USER}: /home/${POSTGRES_USER}/src/ /data/style/
+    # chown -R ${POSTGRES_USER}: /home/${POSTGRES_USER}/src/ /data/style/
     if [ -f /data/style/scripts/get-external-data.py ] && [ -f /data/style/external-data.yml ]; then
-        sudo -E -u ${POSTGRES_USER} python3 /data/style/scripts/get-external-data.py -c /data/style/external-data.yml -D /data/style/data
+        # sudo -E -u ${POSTGRES_USER}
+        python3 /data/style/scripts/get-external-data.py -c /data/style/external-data.yml -D /data/style/data
     fi
 
     # Re${POSTGRES_DB}ter that data has changed for mod_tile caching purposes
-    sudo -u ${POSTGRES_USER} touch /data/database/planet-import-complete
+    # sudo -u ${POSTGRES_USER}
+    touch /data/database/planet-import-complete
 
     # service postgresql stop
 
@@ -173,10 +185,10 @@ if [ "$1" == "run" ]; then
     # start cron job to trigger consecutive updates
     if [ "${UPDATES:-}" == "enabled" ] || [ "${UPDATES:-}" == "1" ]; then
         /etc/init.d/cron start
-        sudo -u ${POSTGRES_USER} touch /var/log/tiles/run.log; tail -f /var/log/tiles/run.log >> /proc/1/fd/1 &
-        sudo -u ${POSTGRES_USER} touch /var/log/tiles/osmosis.log; tail -f /var/log/tiles/osmosis.log >> /proc/1/fd/1 &
-        sudo -u ${POSTGRES_USER} touch /var/log/tiles/expiry.log; tail -f /var/log/tiles/expiry.log >> /proc/1/fd/1 &
-        sudo -u ${POSTGRES_USER} touch /var/log/tiles/osm2pgsql.log; tail -f /var/log/tiles/osm2pgsql.log >> /proc/1/fd/1 &
+        touch /var/log/tiles/run.log; tail -f /var/log/tiles/run.log >> /proc/1/fd/1 &
+        touch /var/log/tiles/osmosis.log; tail -f /var/log/tiles/osmosis.log >> /proc/1/fd/1 &
+        touch /var/log/tiles/expiry.log; tail -f /var/log/tiles/expiry.log >> /proc/1/fd/1 &
+        touch /var/log/tiles/osm2pgsql.log; tail -f /var/log/tiles/osm2pgsql.log >> /proc/1/fd/1 &
 
     fi
 
@@ -186,7 +198,7 @@ if [ "$1" == "run" ]; then
     }
     trap stop_handler SIGTERM
 
-    sudo -u ${POSTGRES_USER} renderd -f -c /etc/renderd.conf &
+    renderd -f -c /etc/renderd.conf &
     child=$!
     wait "$child"
 
