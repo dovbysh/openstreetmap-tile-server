@@ -70,7 +70,8 @@ RUN apt-get install -y --no-install-recommends \
  npm \
  osm2pgsql \
  osmium-tool \
- osmosis
+ osmosis \
+ postgresql-client
 
 # postgresql-$PG_VERSION \
 # postgresql-$PG_VERSION-postgis-3 \

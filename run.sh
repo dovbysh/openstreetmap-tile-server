@@ -31,7 +31,7 @@ set -x
 
 # if there is no custom style mounted, then use osm-carto
 if [ ! "$(ls -A /data/style/)" ]; then
-    mv /home/${POSTGRES_USER}/src/openstreetmap-carto-backup/* /data/style/
+    mv /home/renderer/src/openstreetmap-carto-backup/* /data/style/
 fi
 
 # carto build
@@ -129,7 +129,12 @@ if [ "$1" == "import" ]; then
     # chown -R ${POSTGRES_USER}: /home/${POSTGRES_USER}/src/ /data/style/
     if [ -f /data/style/scripts/get-external-data.py ] && [ -f /data/style/external-data.yml ]; then
         # sudo -E -u ${POSTGRES_USER}
-        python3 /data/style/scripts/get-external-data.py -c /data/style/external-data.yml -D /data/style/data
+        python3 /data/style/scripts/get-external-data.py \
+         -d ${POSTGRES_DB} \
+         --username=${POSTGRES_USER} \
+         --host=${POSTGRES_HOST} \
+         --port=${POSTGRES_PORT} \
+         -c /data/style/external-data.yml -D /data/style/data
     fi
 
     # Re${POSTGRES_DB}ter that data has changed for mod_tile caching purposes
